@@ -22,7 +22,7 @@ const nodes = [
           { id: "a4", name: "accessToken", value: TOKEN, type: "string" },
           { id: "a5", name: "manifestUrl", value: "https://raw.githubusercontent.com/monkherdenett-eng/gabriel-reels/main/manifest.json", type: "string" },
           { id: "a6", name: "dryRun", value: dry, type: "boolean" },
-          { id: "a7", name: "dryDate", value: "", type: "string" },
+          { id: "a7", name: "dryDate", value: process.env.DRY_DATE || "", type: "string" },
         ],
       },
       options: {},
@@ -32,7 +32,7 @@ const nodes = [
   { parameters: { jsCode: code }, name: "Publish IG + FB", type: "n8n-nodes-base.code", typeVersion: 2, position: [480, 100] },
 ];
 const connections = { "Every 30 min": { main: [[{ node: "Config", type: "main", index: 0 }]] }, "Test (manual)": { main: [[{ node: "Config", type: "main", index: 0 }]] }, Config: { main: [[{ node: "Publish IG + FB", type: "main", index: 0 }]] } };
-const body = { name: NAME, nodes, connections, settings: { executionOrder: "v1", timezone: "Asia/Ulaanbaatar", saveDataErrorExecution: "all", saveDataSuccessExecution: "all" } };
+const body = { name: NAME, nodes, connections, settings: { executionOrder: "v1", timezone: "Asia/Ulaanbaatar", saveDataErrorExecution: "all", saveDataSuccessExecution: "all", availableInMCP: true } };
 
 const list = await (await fetch(`${API}/workflows?limit=200`, { headers: H })).json();
 if (!list.data) throw new Error("n8n API: " + JSON.stringify(list).slice(0, 200));
