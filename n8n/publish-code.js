@@ -15,7 +15,8 @@ const dry = cfg.dryRun === true || cfg.dryRun === "true";
 const manifest = await this.helpers.httpRequest({ method: "GET", url: `${cfg.manifestUrl}?t=${Date.now()}`, json: true });
 const ub = new Date(Date.now() + 8 * 3600e3);
 const today = ub.toISOString().slice(0, 10), now = ub.toISOString().slice(11, 16);
-const due = (manifest.posts || []).filter((p) => (dry ? p.date === (cfg.dryDate || today) : p.date === today && p.time <= now));
+const force = cfg.forceDate || ""; // one-off: post this date's entry now (manual test run)
+const due = (manifest.posts || []).filter((p) => (dry ? p.date === (cfg.dryDate || today) : force ? p.date === force : p.date === today && p.time <= now));
 if (!due.length) return [{ json: { skipped: true, today, now, reason: "Энэ цагт нийтлэх пост алга" } }];
 
 // what is already up (exact caption)

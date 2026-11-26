@@ -23,6 +23,7 @@ const nodes = [
           { id: "a5", name: "manifestUrl", value: "https://raw.githubusercontent.com/monkherdenett-eng/gabriel-reels/main/manifest.json", type: "string" },
           { id: "a6", name: "dryRun", value: dry, type: "boolean" },
           { id: "a7", name: "dryDate", value: process.env.DRY_DATE || "", type: "string" },
+          { id: "a8", name: "forceDate", value: process.env.FORCE_DATE || "", type: "string" },
         ],
       },
       options: {},
