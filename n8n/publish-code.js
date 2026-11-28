@@ -5,6 +5,9 @@
 // already has a post with this exact caption is skipped, so a failed or repeated run never double-posts, and a platform
 // that failed is retried on the next run (until the day ends). Copied from «Devterfx - Reels + Carousels» minus the
 // AI-voice label (these are real podcast voices, as they were on Submagic).
+// Posts with `firstComment` (the lesson reels) also get that text as the account's first comment on IG and FB right
+// after publishing (the Graph API cannot pin comments — pin it by hand if wanted). A comment is written once: if the
+// same text is already there it is skipped, and a failed comment is retried on the next run that day.
 const cfg = $input.first().json;
 const G = `https://graph.facebook.com/${cfg.graphVersion}`;
 const token = cfg.accessToken, igUser = cfg.igUserId, pageId = cfg.pageId;
@@ -46,6 +49,13 @@ const waitReady = async (id, tries, gap) => {
   throw new Error("IG container бэлэн болсонгүй: " + id);
 };
 
+// write `text` as a comment on `id` unless the same text is already there (IG field "text", FB field "message")
+const ensureComment = async (platform, id, text) => {
+  const list = await http("GET", `${id}/comments`, { fields: platform === "ig" ? "text" : "message", limit: 50 });
+  if ((list.data || []).some((c) => (c.text ?? c.message) === text)) return "already";
+  const made = await http("POST", `${id}/comments`, { message: text });
+  return made.id;
+};
 const results = [];
 for (const post of due) {
   const out = { id: post.id, date: post.date, time: post.time, ig: null, fb: null, igAttempts: [] };
@@ -53,10 +63,12 @@ for (const post of due) {
   const igDone = igHas.get(post.caption), fbDone = fbHas.get(post.caption);
   if (igDone) out.ig = "already: " + igDone.id;
   if (fbDone) out.fb = "already: " + fbDone.id;
-  if ((!post.ig || igDone) && (!post.fb || fbDone)) continue;
-  try { await ensureMedia(post.videoCdn, post.bytes ? Math.min(post.bytes, 300000) : 300000); } catch (e) { out.error = e.message; continue; }
+  const allUp = (!post.ig || igDone) && (!post.fb || fbDone);
+  if (!allUp) {
+    try { await ensureMedia(post.videoCdn, post.bytes ? Math.min(post.bytes, 300000) : 300000); } catch (e) { out.error = e.message; continue; }
+  }
 
-  if (post.ig && !igDone) {
+  if (post.ig && !igDone && !allUp) {
     for (let attempt = 1; attempt <= 3 && !out.ig; attempt++) {
       try {
         const creation = (await http("POST", `${igUser}/media`, { media_type: "REELS", video_url: post.videoCdn, caption: post.caption, share_to_feed: true })).id;
@@ -70,7 +82,7 @@ for (const post of due) {
     }
   }
 
-  if (post.fb && !fbDone && !dry) {
+  if (post.fb && !fbDone && !dry && !allUp) {
     try {
       const start = await http("POST", `${pageId}/video_reels`, { upload_phase: "start" });
       await this.helpers.httpRequest({ method: "POST", url: `https://rupload.facebook.com/video-upload/${cfg.graphVersion}/${start.video_id}`, headers: { Authorization: `OAuth ${token}`, file_url: post.videoCdn }, json: true });
@@ -84,6 +96,13 @@ for (const post of due) {
     }
   }
   if (dry) out.fb = out.fb || "dry-run: FB skipped";
+
+  if (post.firstComment && !dry) {
+    const igId = igDone ? igDone.id : /^\d+$/.test(String(out.ig)) ? out.ig : null;
+    const fbId = fbDone ? fbDone.id : out.fb && !String(out.fb).startsWith("already") ? out.fb : null;
+    if (post.ig && igId) { try { out.igComment = await ensureComment("ig", igId, post.firstComment); } catch (e) { out.igCommentError = String(e.message || e).slice(0, 200); } }
+    if (post.fb && fbId) { try { out.fbComment = await ensureComment("fb", fbId, post.firstComment); } catch (e) { out.fbCommentError = String(e.message || e).slice(0, 200); } }
+  }
 }
 
 // a failed platform marks the execution red (visible in n8n); the next half hour retries only what is missing
